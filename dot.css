@@ -187,7 +187,7 @@ button.bcol{cursor:pointer}button.bcol:hover{background:var(--soft)}
 .tbl td{padding:10px;border-bottom:1px solid var(--line);white-space:nowrap}
 .tbl tr:last-child td{border-bottom:0}
 .tbl .prize{padding:3px 10px;font-size:12px}
-@media (max-width:760px){.kpis.k4{grid-template-columns:repeat(2,1fr)}.stats3{grid-template-columns:1fr}.repnav span{min-width:140px}}
+@media (max-width:760px){.kpis.k4{grid-template-columns:repeat(2,1fr)}.stats3{grid-template-columns:1fr}.repnav span{min-width:140px}.repbar{flex-direction:column;align-items:center}.reptipo{justify-content:center;flex-wrap:nowrap;max-width:100%}.reptipo button{padding:8px 9px;font-size:13px;white-space:nowrap}.repbar .tools{justify-content:center}}
 @media print{
   .hdr,.bottomnav,.noprint,.reptipo,.repnav button,.toast{display:none!important}
   body,.box{background:#fff!important;color:#000!important;box-shadow:none!important}
@@ -225,7 +225,8 @@ button.bcol{cursor:pointer}button.bcol:hover{background:var(--soft)}
   .mstrip b.pos{color:var(--in)}.mstrip b.neg{color:var(--out)}
   .monthside,.hojebox .slots,.avbox .avlist,.avbox .hint,.kpis.kh .kpi:nth-child(2),.kpis.kh .kpi:nth-child(5),.kpis.kh .kpi:nth-child(6){display:none}
   .hojebox{gap:12px}
-  .daytype{font-size:12px}
+  .daytype{font-size:12px;flex-wrap:nowrap;gap:2px;white-space:nowrap}
+  .daytype .linkbtn{padding:6px 2px}
 }
 .stline{display:flex;gap:6px 16px;flex-wrap:wrap;width:100%}
 @media (max-width:760px){.stline{flex-wrap:nowrap;justify-content:space-between;gap:6px}.stline span{display:grid;text-align:center;font-size:12px;white-space:nowrap}.stline b{font-size:15px}}
@@ -239,7 +240,7 @@ button.bcol{cursor:pointer}button.bcol:hover{background:var(--soft)}
   .tbl th:nth-child(2),.tbl td:nth-child(2),.tbl th:nth-child(3),.tbl td:nth-child(3),.tbl th:nth-child(4),.tbl td:nth-child(4),.tbl th:nth-child(5),.tbl td:nth-child(5){display:none}
   .bleg{font-size:12px}
 }
-@media (max-width:760px){.dayrow{grid-template-columns:44px 1fr auto;gap:10px;padding:10px 6px}.dayrow .val{grid-column:3;margin:0;text-align:right}.dayrow .t{font-size:14px}.dayrow .t .num{letter-spacing:-.3px}}
+@media (max-width:760px){.dayrow{grid-template-columns:44px 1fr auto;gap:10px;padding:10px 6px}.dayrow .val{grid-column:3;margin:0;text-align:right}.dayrow .t{font-size:14px}.dayrow .t .num{letter-spacing:-.3px;white-space:nowrap;font-size:13px}}
 .acts{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
 .acts .btn{padding:11px 8px;border-radius:14px;font-size:14px;background:var(--soft);border-color:transparent}
 .acts .btn.danger{background:color-mix(in srgb,var(--out) 12%,transparent);color:var(--out)}

@@ -394,35 +394,46 @@ setInterval(() => { if (S && av().on && !timers.length) schedule(); }, 5 * 60000
 
 /* ---------- Mês ---------- */
 function pgMes() {
-  const mi = monthInfo(cur), of = S.oficial[cur];
+  const mi = monthInfo(cur);
   $("#view").innerHTML = `<section class="grid anim" style="margin-top:0">
    <div class="c5" style="display:grid;gap:16px;align-content:start">${monthCard(mi, cur, false)}
    </div>
    <div class="c7" style="display:grid;gap:16px;align-content:start">
     <div class="box"><h2>Saldo por dia</h2>${dayBars(mi, cur)}</div>
     <div class="box"><h2>Dias <button class="btn sm" id="addDay">+ Outro dia</button></h2><div class="list">${mi.days.slice().reverse().map(dayRow).join("") || '<p class="hint keep">Nada por aqui ainda.</p>'}</div></div>
-    <div class="box"><h2>Saldo do sistema da empresa</h2><p class="hint">Digite o saldo que o sistema oficial mostra para este mês (ex.: +0:09 ou -1:20) para comparar com a conta do app.</p>
-     <div class="tools"><input class="hin wide" id="ofIn" inputmode="text" placeholder="+0:00" value="${of != null ? sgn(of).replace("−", "-") : ""}" aria-label="Saldo oficial"><button class="btn acc" id="ofSave">Salvar</button>${of != null ? '<button class="btn" id="ofDel">Limpar</button>' : ""}</div>
-     <div class="err" id="ofErr"></div></div>
    </div></section>`;
   const v = $("#view");
   v.querySelectorAll("[data-day]").forEach(r => r.onclick = () => editDay(r.dataset.day));
   $("#addDay").onclick = pickDay;
-  $("#ofSave").onclick = () => { const s = $("#ofIn").value.trim().replace("−", "-"), mm = s.match(/^([+-]?)(\d{1,3}):([0-5]\d)$/); if (!mm) return $("#ofErr").textContent = "Use o formato +0:09 ou -1:20."; S.oficial[cur] = (mm[1] === "-" ? -1 : 1) * (+mm[2] * 60 + +mm[3]); commit("Saldo oficial salvo"); };
-  if ($("#ofDel")) $("#ofDel").onclick = () => { delete S.oficial[cur]; commit(); };
+}
+/* saldo oficial da empresa: fica em Ajustes; o mês escolhido começa no mês que estava aberto em Mês */
+let ofM = null;
+function oficialBox() {
+  ofM = ofM || cur; const of = S.oficial[ofM];
+  return `<div class="box" id="ofBox"><h2>Saldo do sistema da empresa</h2><p class="hint">Digite o saldo que o sistema oficial mostra (ex.: +0:09 ou -1:20) para comparar com a conta do app em Mês.</p>
+   <div class="tools" style="margin-bottom:8px"><button class="btn sm" id="ofPrev" aria-label="Mês anterior">‹</button><b>${mLabel(ofM)}</b><button class="btn sm" id="ofNext" aria-label="Próximo mês">›</button></div>
+   <div class="tools"><input class="hin wide" id="ofIn" inputmode="text" placeholder="+0:00" value="${of != null ? sgn(of).replace("−", "-") : ""}" aria-label="Saldo oficial"><button class="btn acc" id="ofSave">Salvar</button>${of != null ? '<button class="btn" id="ofDel">Limpar</button>' : ""}</div>
+   <div class="err" id="ofErr"></div></div>`;
+}
+function bindOficial() {
+  $("#ofPrev").onclick = () => { ofM = addM(ofM, -1); render(); };
+  $("#ofNext").onclick = () => { ofM = addM(ofM, 1); render(); };
+  $("#ofSave").onclick = () => { const s = $("#ofIn").value.trim().replace("−", "-"), mm = s.match(/^([+-]?)(\d{1,3}):([0-5]\d)$/); if (!mm) return $("#ofErr").textContent = "Use o formato +0:09 ou -1:20."; S.oficial[ofM] = (mm[1] === "-" ? -1 : 1) * (+mm[2] * 60 + +mm[3]); commit("Saldo oficial salvo"); };
+  if ($("#ofDel")) $("#ofDel").onclick = () => { delete S.oficial[ofM]; commit(); };
 }
 /* gráfico do mês: uma coluna por dia do calendário. Só dia fechado tem barra (é o que conta no saldo);
    dia em aberto vira um ponto na linha do zero. */
 function dayBars(mi, m) {
   if (!mi.days.length) return '<p class="hint keep">Nenhum dia registrado neste mês.</p>';
   const by = Object.fromEntries(mi.days.map(d => [d.k, d])), closed = mi.days.filter(d => d.status === "ok" && d.saldoEmp);
-  const mx = Math.max(30, ...closed.map(d => Math.abs(d.saldoEmp))), tk = todayK();
+  // escala limitada: uma falta (−8:48) não pode achatar os outros dias; barra cortada no teto mantém o valor escrito
+  const mx = Math.max(30, ...closed.map(d => Math.min(Math.abs(d.saldoEmp), 90))), tk = todayK();
   const best = closed.reduce((a, d) => d.saldoEmp > (a?.saldoEmp ?? 0) ? d : a, null), worst = closed.reduce((a, d) => d.saldoEmp < (a?.saldoEmp ?? 0) ? d : a, null);
-  // valor escrito: primeiro o melhor e o pior, depois os outros que couberem (3 colunas de folga entre vizinhos do mesmo lado)
+  // valor escrito: primeiro o melhor e o pior, depois os outros que couberem (5 colunas de folga entre vizinhos do mesmo lado, senão os valores se sobrepõem no celular)
   const lab = [], dn = d => +d.k.slice(8);
-  [best, worst, ...closed].forEach(d => { if (d && !lab.some(o => Math.sign(o.saldoEmp) === Math.sign(d.saldoEmp) && Math.abs(dn(o) - dn(d)) < 3)) lab.push(d); });
+  [best, worst, ...closed].forEach(d => { if (d && !lab.some(o => Math.sign(o.saldoEmp) === Math.sign(d.saldoEmp) && Math.abs(dn(o) - dn(d)) < 5)) lab.push(d); });
   const cols = Array.from({ length: +lastDay(m).slice(8) }, (_, i) => {
-    const day = i + 1, k = m + "-" + pad(day), d = by[k], open = d && d.status !== "ok", v = d && !open ? d.saldoEmp : 0, h = Math.abs(v) / mx * 80;
+    const day = i + 1, k = m + "-" + pad(day), d = by[k], open = d && d.status !== "ok", v = d && !open ? d.saldoEmp : 0, h = Math.min(Math.abs(v) / mx, 1) * 80;
     const lbl = lab.includes(d) ?`<b style="${v > 0 ? "bottom" : "top"}:calc(${h}% + 3px)">${sgn(v)}</b>` : "";
     const body = `<div class="bup">${v > 0 ? `<i style="height:${h}%"></i>${lbl}` : ""}</div><div class="bdn">${v < 0 ? `<i style="height:${h}%"></i>${lbl}` : open ? '<u class="bdot"></u>' : ""}</div>
       <span class="bx ${day === 1 || day % 5 === 0 ? "" : "minor"}">${day}</span>`;
@@ -477,16 +488,20 @@ function editDay(k) {
   });
 }
 
-/* ---------- Relatório: mês, bimestre, trimestre, ano ou período personalizado ---------- */
-const REP = { mes: ["Mês", 1], bim: ["Bimestre", 2], tri: ["Trimestre", 3], ano: ["Ano", 12], per: ["Personalizado", 0] };
+/* ---------- Relatório: semana, mês, ano ou período personalizado ---------- */
+const REP = { sem: ["Semana", -1], mes: ["Mês", 1], ano: ["Ano", 12], per: ["Personalizado", 0] };
 let rep = { tipo: "mes", ref: null, de: null, ate: null };
 function repRange() {
-  const n = REP[rep.tipo][1], ref = rep.ref || ym(todayK());
+  const n = REP[rep.tipo][1];
   if (!n) return { from: rep.de || ym(todayK()) + "-01", to: rep.ate || todayK() };
-  const [y, m] = ref.split("-").map(Number), m0 = Math.floor((m - 1) / n) * n + 1, first = y + "-" + pad(m0), last = addM(first, n - 1);
-  const ord = ["1º", "2º", "3º", "4º", "5º", "6º"];
-  const label = n === 1 ? mLabel(first) : n === 12 ? String(y) : `${ord[(m0 - 1) / n]} ${n === 2 ? "bimestre" : "trimestre"} de ${y}`;
-  return { from: first + "-01", to: lastDay(last), label, first, n };
+  if (n < 0) { // semana de segunda a domingo; ref = qualquer dia da semana
+    const d = dateOf(rep.refD || todayK()); d.setDate(d.getDate() - (d.getDay() + 6) % 7);
+    const mv = k => { const x = new Date(d); x.setDate(x.getDate() + k); return dk(x); }, from = mv(0), to = mv(6);
+    return { from, to, label: `${from.slice(8)}/${from.slice(5, 7)} a ${to.slice(8)}/${to.slice(5, 7)}`, prev: mv(-7), next: mv(7), n };
+  }
+  const ref = rep.ref || ym(todayK()), [y, m] = ref.split("-").map(Number), m0 = Math.floor((m - 1) / n) * n + 1, first = y + "-" + pad(m0), last = addM(first, n - 1);
+  const label = n === 1 ? mLabel(first) : String(y);
+  return { from: first + "-01", to: lastDay(last), label, prev: addM(first, -n), next: addM(first, n), n };
 }
 const fmtD = k => k.slice(8) + "/" + k.slice(5, 7) + "/" + k.slice(0, 4);
 function pgRel() {
@@ -510,7 +525,7 @@ function pgRel() {
    <div class="box c12"><h2>O que tirou horas <small>${oc.length} dia(s)</small></h2>${oc.length ? `<div class="list">${oc.map(dayRow).join("")}</div>` : '<p class="hint keep">Nenhum atraso, saída antecipada ou falta no período.</p>'}</div>
    </section>`;
   segBind($("#repSeg"), "t", t => { rep.tipo = t; render(); });
-  if ($("#rPrev")) { $("#rPrev").onclick = () => { rep.ref = addM(R.first, -R.n); render(); }; $("#rNext").onclick = () => { rep.ref = addM(R.first, R.n); render(); }; }
+  if ($("#rPrev")) { const go = v => { if (R.n < 0) rep.refD = v; else rep.ref = v; render(); }; $("#rPrev").onclick = () => go(R.prev); $("#rNext").onclick = () => go(R.next); }
   if ($("#rDe")) { const ch = () => { const a = $("#rDe").value, b = $("#rAte").value; if (a && b) { rep.de = a < b ? a : b; rep.ate = a < b ? b : a; render(); } }; $("#rDe").onchange = ch; $("#rAte").onchange = ch; }
   $("#view").querySelectorAll("[data-day]").forEach(x => x.onclick = () => editDay(x.dataset.day));
   $("#prnBtn").onclick = () => print();
@@ -599,9 +614,10 @@ function pgAjustes() {
     <p class="hint" style="margin-top:10px">O banco de horas fecha por mês: o saldo de um mês não passa para o seguinte.</p></div>
    <div class="c6" style="display:grid;gap:16px;align-content:start">
    ${regraBox()}
+   ${oficialBox()}
    ${avisosBox()}
    <div class="box"><h2>Aparência</h2><p class="hint">Por padrão as cores mudam com o horário: amanhecer, dia, entardecer, noite e madrugada.</p><div class="fld">Céu<div class="seg" id="themeSeg">${[["auto", "Seguir o horário"], ["light", "Sempre dia"], ["dark", "Sempre noite"]].map(([k, t]) => `<button data-t="${k}" aria-pressed="${S.prefs.theme === k}">${t}</button>`).join("")}</div></div></div>
-   <div class="box"><h2>Conta</h2><p class="hint">Conectado como <b>${esc(Store.user?.email)}</b>. Seus dados são criptografados antes de sair do aparelho: nem o administrador consegue ler.</p>
+   <div class="box"><h2>Conta</h2><p class="hint">Conectado como <b>${esc(Store.user?.email)}</b>. Seus dados ficam criptografados. Se esquecer a senha, é só pedir um código no seu e-mail.</p>
     <div class="fld" style="margin-top:10px">Ao abrir o dot. neste aparelho
      <label class="pref"><input type="radio" name="openMode" value="direto"> Entrar direto, sem pedir nada</label>
      <label class="pref" id="bioRow" style="display:none"><input type="radio" name="openMode" value="bio"> Pedir biometria (Face ID / digital)</label>
@@ -611,7 +627,7 @@ function pgAjustes() {
    <div class="box desk"><h2>Instalar no celular ou PC</h2><p class="hint" style="margin-bottom:0"><b>iPhone:</b> abra no Safari → Compartilhar → “Adicionar à Tela de Início”. <b>Android:</b> Chrome → menu ⋮ → “Instalar app”. <b>PC:</b> Chrome/Edge → ícone de instalar na barra de endereço.</p></div></div>
    </section>`;
   const v = $("#view"), ins = [...v.querySelectorAll(".slots .hin")];
-  bindRegra(); bindAvisos();
+  bindRegra(); bindOficial(); bindAvisos();
   ins.forEach((inp, i) => maskTime(inp, () => ins[i + 1]?.focus()));
   let dias = [...j.dias];
   $("#wdSeg").onclick = e => { const b = e.target.closest("button"); if (!b) return; const d = +b.dataset.d; dias = dias.includes(d) ? dias.filter(x => x !== d) : [...dias, d]; b.setAttribute("aria-pressed", dias.includes(d)); };
@@ -665,20 +681,14 @@ function showAuth(msg, startMode, preEmail) {
       sent: `<h2>Nova senha</h2><p class="hint">Se existir conta com <b>${esc(email0)}</b>, chegou um código no e-mail (confira o spam).</p>
         ${codeFld}
         <label class="fld">Nova senha<input id="aPw" type="password" required minlength="8" autocomplete="new-password"></label>
-        <label class="fld">Código de recuperação do dot.<input id="aCode" required placeholder="XXXX-XXXX-XXXX-XXXX-XXXX" autocomplete="off"></label>
         ${E}<button class="btn acc" style="padding:12px">Trocar senha e entrar</button>
         <button type="button" class="linkbtn" data-m="forgot">Reenviar código</button>${back}`,
       verify: `<h2>Confirme seu e-mail</h2><p class="hint">Mandamos um código de 6 dígitos para <b>${esc(email0)}</b>. Confira também o spam.</p>
         ${codeFld}${E}<button class="btn acc" style="padding:12px">Confirmar e criar conta</button>
         <button type="button" class="linkbtn" id="aResend">Reenviar código</button>${back}`,
-      newpw: `<h2>Nova senha</h2><p class="hint">Crie a nova senha. Para abrir seus dados criptografados, digite também o <b>código de recuperação</b> do dot. que você guardou.</p>
+      newpw: `<h2>Nova senha</h2><p class="hint">Crie a nova senha.</p>
         <label class="fld">Nova senha<input id="aPw" type="password" required minlength="8" autocomplete="new-password"></label>
-        <label class="fld">Código de recuperação<input id="aCode" required placeholder="XXXX-XXXX-XXXX-XXXX-XXXX" autocomplete="off"></label>
         ${E}<button class="btn acc" style="padding:12px">Trocar senha e entrar</button>`,
-      rec: `<h2>Destravar seus dados</h2><p class="hint">Sua senha mudou. Digite o <b>código de recuperação</b> do dot. que você guardou.</p>
-        <label class="fld">Código de recuperação<input id="aCode" required placeholder="XXXX-XXXX-XXXX-XXXX-XXXX" autocomplete="off"></label>
-        <label class="fld">Sua senha<input id="aPw" type="password" required minlength="8" autocomplete="current-password"></label>
-        ${E}<button class="btn acc" style="padding:12px">Destravar</button>`,
       in: `<h2>Entrar</h2>${Store.cloudReady ? `${emailFld()}
         <label class="fld">Senha<input id="aPw" type="password" required minlength="8" autocomplete="current-password"></label>
         ${rememberFld}${E}<button class="btn acc" style="padding:12px">Entrar</button>
@@ -686,7 +696,7 @@ function showAuth(msg, startMode, preEmail) {
         <div style="display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px"><hr style="flex:1;border:0;border-top:1px solid var(--line)">primeira vez?<hr style="flex:1;border:0;border-top:1px solid var(--line)"></div>
         <button type="button" class="btn" data-m="up" style="padding:12px">Criar conta</button>`
         : `<p class="hint">O login online ainda não foi configurado neste endereço.</p>`}
-        <p class="hint" style="font-size:12px">Seus dados são criptografados no seu aparelho antes de irem para a nuvem. Ninguém além de você consegue lê-los.</p>`,
+        <p class="hint" style="font-size:12px">Seus dados ficam criptografados e guardados na nuvem, protegidos pela sua conta.</p>`,
     };
     $("#authForm").innerHTML = V[mode]; Controls.enhance($("#authForm"));
     document.querySelectorAll("#authForm [data-m]").forEach(b => b.onclick = () => { email0 = $("#aEmail")?.value || email0; mode = b.dataset.m; msg = ""; draw(); });
@@ -712,40 +722,30 @@ function showAuth(msg, startMode, preEmail) {
       if (email) email0 = email;
       if ($("#aRemember")) Store.setRemember($("#aRemember").checked);
       if (mode === "forgot") { await Store.resetEmail(email); mode = "sent"; msg = ""; return draw(); }
-      if (mode === "sent") { await Store.verifyCode(email0, $("#aOtp").value, "recovery"); S = fixState((await Store.recover($("#aCode").value, pw)).state); enterApp(); toast("Senha trocada"); return; }
+      if (mode === "sent") { await Store.verifyCode(email0, $("#aOtp").value, "recovery"); S = fixState((await Store.recover(pw)).state); enterApp(); toast("Senha trocada"); return; }
       if (mode === "verify") {
         await Store.verifyCode(email0, $("#aOtp").value, "signup");
-        const c = await Store.createVault(pendingPw, baseState()); pendingPw = ""; S = c.state; return showRecovery(c.recoveryCode);
+        const c = await Store.createVault(pendingPw, baseState()); pendingPw = ""; S = c.state; return startFirst();
       }
-      if (mode === "newpw") { S = fixState((await Store.recover($("#aCode").value, pw)).state); enterApp(); toast("Senha trocada"); return; }
-      if (mode === "rec") { S = fixState((await Store.recover($("#aCode").value, pw)).state); enterApp(); toast("Acesso recuperado"); return; }
+      if (mode === "newpw") { S = fixState((await Store.recover(pw)).state); enterApp(); toast("Senha trocada"); return; }
       if (mode === "up") {
         if (pw !== $("#aPw2").value) return err("As senhas não são iguais.");
         const r = await Store.signUp(email, pw, baseState());
         if (r.confirmEmail) { pendingPw = pw; mode = "verify"; msg = ""; return draw(); }
-        S = r.state; return showRecovery(r.recoveryCode);
+        S = r.state; return startFirst();
       }
       const r = await Store.signIn(email, pw);
-      if (r.noVault) { const c = await Store.createVault(pw, baseState()); S = c.state; return showRecovery(c.recoveryCode); }
-      if (r.needRecovery) { mode = "rec"; return draw(); }
+      if (r.noVault) { const c = await Store.createVault(pw, baseState()); S = c.state; return startFirst(); }
       S = fixState(r.state); enterApp();
     } catch (ex) {
       const m = ex?.message || "";
       if (mode === "in" && /not confirmed/i.test(m)) { pendingPw = $("#aPw").value; mode = "verify"; msg = ""; draw(); Store.resendSignup(email0).catch(() => {}); return; }
-      err(/not allowed|disabled/i.test(m) ? "Cadastro fechado neste app." : /Invalid login/i.test(m) ? "E-mail ou senha incorretos." : /registered|already/i.test(m) ? "Esse e-mail já tem conta. Tente entrar." : /token|otp|expired/i.test(m) ? "Código do e-mail inválido ou vencido. Peça outro." : /not confirmed/i.test(m) ? "Confirme seu e-mail antes de entrar." : /fetch|network|Failed/i.test(m) ? "Sem conexão. Verifique a internet." : /decrypt|operation/i.test(m) ? "Código de recuperação incorreto." : "Algo deu errado. Tente de novo.");
+      err(/not allowed|disabled/i.test(m) ? "Cadastro fechado neste app." : /Invalid login/i.test(m) ? "E-mail ou senha incorretos." : /registered|already/i.test(m) ? "Esse e-mail já tem conta. Tente entrar." : /token|otp|expired/i.test(m) ? "Código do e-mail inválido ou vencido. Peça outro." : /not confirmed/i.test(m) ? "Confirme seu e-mail antes de entrar." : /fetch|network|Failed/i.test(m) ? "Sem conexão. Verifique a internet." : /decrypt|operation/i.test(m) ? "Não foi possível abrir seus dados. Tente entrar de novo." : "Algo deu errado. Tente de novo.");
     } finally { if (btn.isConnected) { btn.innerHTML = old; btn.disabled = false; } }
   };
   draw();
 }
-function showRecovery(code) {
-  $("#authForm").innerHTML = `<h2>Guarde este código</h2><p class="hint">Se esquecer a senha, é a <b>única forma</b> de recuperar seus dados do dot. — nem nós conseguimos, porque tudo é criptografado. Anote ou tire print e guarde em lugar seguro.</p>
-   <div class="reccode">${code}</div><button type="button" class="btn" id="copyRec">Copiar código</button>
-   <label class="note" style="cursor:pointer;align-items:center"><input type="checkbox" id="saved"> Guardei o código em lugar seguro</label>
-   <button type="button" class="btn acc" id="goIn" style="padding:12px" disabled>Começar a usar</button>`;
-  $("#copyRec").onclick = () => navigator.clipboard?.writeText(code).then(() => toast("Código copiado"), () => {});
-  $("#saved").onchange = e => $("#goIn").disabled = !e.target.checked;
-  $("#goIn").onclick = () => { enterApp(); setTimeout(tour, 600); };
-}
+function startFirst() { enterApp(); setTimeout(tour, 600); }
 const fixState = st => ({ ...baseState(), ...st, prefs: { ...baseState().prefs, ...(st?.prefs || {}) } });
 function enterApp() {
   $("#authShell").hidden = true; $("#appShell").hidden = false; $("#bottomnav").hidden = false;

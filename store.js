@@ -19,7 +19,6 @@
     const raw = await open(await deriveKey(secret, salt), s);
     return crypto.subtle.importKey("raw", raw, "AES-GCM", true, ["encrypt", "decrypt"]);
   }
-  const newRecoveryCode = () => { const a = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; const r = rnd(20); let s = ""; r.forEach((x, i) => { s += a[x % a.length]; if (i % 4 === 3 && i < 19) s += "-"; }); return s; };
 
   const cfg = window.CV_CONFIG || {};
   const cloudReady = !!(cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase);
@@ -85,6 +84,14 @@
     return data;
   }
 
+  /* sem código para guardar: a "chave de recuperação" é derivada do id da conta (o servidor consegue reabrir o cofre; acesso só após o código do e-mail) */
+  const autoRec = () => "dot-rec-v1:" + user.id;
+  async function ensureAutoRec(row) { // cofres antigos (com código aleatório guardado pelo usuário) passam para a chave automática no próximo login com senha
+    try { await unwrap(row.key_rec, autoRec(), row.rec_salt); return; } catch (e) {}
+    const rec_salt = b64(rnd(16));
+    await sb.from("ponto_vaults").update({ rec_salt, key_rec: await wrap(dataKey, autoRec(), rec_salt) }).eq("user_id", user.id);
+  }
+
   const Store = {
     cloudReady,
     get mode() { return mode; },
@@ -116,14 +123,14 @@
 
     async createVault(password, initialState) {
       dataKey = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
-      const rec = newRecoveryCode(), kdf_salt = b64(rnd(16)), rec_salt = b64(rnd(16));
+      const rec = autoRec(), kdf_salt = b64(rnd(16)), rec_salt = b64(rnd(16));
       const row = { user_id: user.id, version: 1, kdf_salt, rec_salt,
         key_pw: await wrap(dataKey, password, kdf_salt), key_rec: await wrap(dataKey, rec, rec_salt),
         data: await seal(dataKey, enc.encode(JSON.stringify(initialState))) };
       const { error } = await sb.from("ponto_vaults").insert(row);
       if (error) throw error;
       mode = "cloud"; version = 1; await cacheKey();
-      return { recoveryCode: rec, state: initialState };
+      return { state: initialState };
     },
 
     async signIn(email, password) {
@@ -132,19 +139,23 @@
       user = data.user;
       const row = await pull();
       if (!row) return { noVault: true };
-      try { dataKey = await unwrap(row.key_pw, password, row.kdf_salt); }
-      catch (e) { return { needRecovery: true }; } // senha trocada por e-mail: pedir código de recuperação
+      try { dataKey = await unwrap(row.key_pw, password, row.kdf_salt); await ensureAutoRec(row).catch(() => {}); }
+      catch (e) { // senha trocada por e-mail sem terminar: a chave automática reabre o cofre e a senha digitada vira a nova
+        dataKey = await unwrap(row.key_rec, autoRec(), row.rec_salt);
+        const kdf_salt = b64(rnd(16));
+        await sb.from("ponto_vaults").update({ kdf_salt, key_pw: await wrap(dataKey, password, kdf_salt) }).eq("user_id", user.id);
+      }
       mode = "cloud"; version = row.version; await cacheKey();
       return { state: JSON.parse(dec.decode(await open(dataKey, row.data))) };
     },
 
-    /* esqueceu a senha: e-mail do Supabase troca a senha de login; o código de recuperação reabre o cofre */
+    /* esqueceu a senha: o código do e-mail prova quem é; a chave automática do cofre (derivada da conta) reabre os dados */
     inRecovery: false,
-    async recover(code, newPassword) {
+    async recover(newPassword) {
       if (this.inRecovery) { const { error } = await sb.auth.updateUser({ password: newPassword }); if (error) throw error; this.inRecovery = false; }
       const { data: s } = await sb.auth.getUser(); user = s.user;
       const row = await pull();
-      dataKey = await unwrap(row.key_rec, code.trim().toUpperCase(), row.rec_salt);
+      dataKey = await unwrap(row.key_rec, autoRec(), row.rec_salt);
       const kdf_salt = b64(rnd(16));
       const { error } = await sb.from("ponto_vaults").update({ kdf_salt, key_pw: await wrap(dataKey, newPassword, kdf_salt) }).eq("user_id", user.id);
       if (error) throw error;
