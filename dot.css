@@ -229,3 +229,14 @@ button.bcol{cursor:pointer}button.bcol:hover{background:var(--soft)}
 }
 .stline{display:flex;gap:6px 16px;flex-wrap:wrap;width:100%}
 @media (max-width:760px){.stline{flex-wrap:nowrap;justify-content:space-between;gap:6px}.stline span{display:grid;text-align:center;font-size:12px;white-space:nowrap}.stline b{font-size:15px}}
+
+/* ---- outras telas no celular: menos texto ---- */
+.mob{display:none}
+@media (max-width:760px){
+  .mob{display:block;margin:0 0 10px;font-size:14px;font-weight:600;color:var(--muted)}
+  #view .box>.hint:not(.keep),#view .desk,.dayrow .m,.row .val small,.stats3>div:nth-child(3){display:none}
+  .stats3{grid-template-columns:repeat(2,1fr)}
+  .tbl th:nth-child(2),.tbl td:nth-child(2),.tbl th:nth-child(3),.tbl td:nth-child(3),.tbl th:nth-child(4),.tbl td:nth-child(4),.tbl th:nth-child(5),.tbl td:nth-child(5){display:none}
+  .bleg{font-size:12px}
+}
+@media (max-width:760px){.dayrow{grid-template-columns:44px 1fr auto;gap:10px;padding:10px 6px}.dayrow .val{grid-column:3;margin:0;text-align:right}.dayrow .t{font-size:14px}.dayrow .t .num{letter-spacing:-.3px}}

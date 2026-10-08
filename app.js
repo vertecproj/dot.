@@ -275,7 +275,7 @@ function monthCard(mi, m, compact) {
     <span class="prize ${ok ? "ok" : "bad"}">${ok ? "Prêmio garantido" : "Prêmio em risco"}</span>
     ${compact ? (hj != null ? `<p class="hint" style="margin:8px 0 0">Com hoje até agora: <b class="${hj >= 0 ? "pos" : "neg"}">${sgn(hj)}</b></p>` : "") : `<p class="hint" style="margin:8px 0 0">Como o sistema ${regra().empresa ? "da " + esc(regra().empresa) : "da empresa"} conta (${regra().tol ? `ignora até ${regra().tol} min por marcação${regra().teto ? `, máx. ${regra().teto} no dia` : ""}` : "sem tolerância"}). ${ok ? `Margem de ${dur(mi.totalEmp)}.` : `Faltam ${dur(-mi.totalEmp)} para zerar.`}${hj != null ? ` Com hoje até agora: <b class="${hj >= 0 ? "pos" : "neg"}">${sgn(hj)}</b>.` : ""}</p>
     <p class="hint" style="margin:4px 0 0">No relógio, minuto a minuto: <b class="num">${sgn(mi.total)}</b>.${of != null ? ` Sistema informado: <b class="num">${sgn(of)}</b> (diferença ${sgn(of - mi.totalEmp)}).` : ""}</p>`}
-    ${!compact ? kpis(mi) : ""}
+    ${!compact ? `<p class="mob">${ok ? `Margem de ${dur(mi.totalEmp)}` : `Faltam ${dur(-mi.totalEmp)} para zerar`}</p>${kpis(mi)}` : ""}
     ${mi.vazios.length ? `<p class="warnchip" style="margin-top:10px">${mi.vazios.length} dia(s) sem registro completo</p>` : ""}</div>`;
 }
 const kpis = r => `<div class="kpis k4"><div class="kpi"><div class="l">Extras</div><div class="v num pos">${sgn(r.extra)}</div></div><div class="kpi"><div class="l">Atrasos</div><div class="v num neg">${sgn(r.atraso)}</div></div><div class="kpi"><div class="l">Saídas antes</div><div class="v num neg">${sgn(r.antecip)}</div></div><div class="kpi"><div class="l">Faltas${r.nFaltas ? ` (${r.nFaltas})` : ""}</div><div class="v num neg">${sgn(r.faltas)}</div></div></div>`;
@@ -397,13 +397,13 @@ function pgMes() {
   const mi = monthInfo(cur), of = S.oficial[cur];
   $("#view").innerHTML = `<section class="grid anim" style="margin-top:0">
    <div class="c5" style="display:grid;gap:16px;align-content:start">${monthCard(mi, cur, false)}
-    <div class="box"><h2>Saldo do sistema da empresa</h2><p class="hint">Digite o saldo que o sistema oficial mostra para este mês (ex.: +0:09 ou -1:20) para comparar com a conta do app.</p>
-     <div class="tools"><input class="hin wide" id="ofIn" inputmode="text" placeholder="+0:00" value="${of != null ? sgn(of).replace("−", "-") : ""}" aria-label="Saldo oficial"><button class="btn acc" id="ofSave">Salvar</button>${of != null ? '<button class="btn" id="ofDel">Limpar</button>' : ""}</div>
-     <div class="err" id="ofErr"></div></div>
    </div>
    <div class="c7" style="display:grid;gap:16px;align-content:start">
     <div class="box"><h2>Saldo por dia</h2>${dayBars(mi, cur)}</div>
-    <div class="box"><h2>Dias <button class="btn sm" id="addDay">+ Outro dia</button></h2><div class="list">${mi.days.slice().reverse().map(dayRow).join("") || '<p class="hint">Nada por aqui ainda.</p>'}</div></div>
+    <div class="box"><h2>Dias <button class="btn sm" id="addDay">+ Outro dia</button></h2><div class="list">${mi.days.slice().reverse().map(dayRow).join("") || '<p class="hint keep">Nada por aqui ainda.</p>'}</div></div>
+    <div class="box"><h2>Saldo do sistema da empresa</h2><p class="hint">Digite o saldo que o sistema oficial mostra para este mês (ex.: +0:09 ou -1:20) para comparar com a conta do app.</p>
+     <div class="tools"><input class="hin wide" id="ofIn" inputmode="text" placeholder="+0:00" value="${of != null ? sgn(of).replace("−", "-") : ""}" aria-label="Saldo oficial"><button class="btn acc" id="ofSave">Salvar</button>${of != null ? '<button class="btn" id="ofDel">Limpar</button>' : ""}</div>
+     <div class="err" id="ofErr"></div></div>
    </div></section>`;
   const v = $("#view");
   v.querySelectorAll("[data-day]").forEach(r => r.onclick = () => editDay(r.dataset.day));
@@ -414,7 +414,7 @@ function pgMes() {
 /* gráfico do mês: uma coluna por dia do calendário. Só dia fechado tem barra (é o que conta no saldo);
    dia em aberto vira um ponto na linha do zero. */
 function dayBars(mi, m) {
-  if (!mi.days.length) return '<p class="hint">Nenhum dia registrado neste mês.</p>';
+  if (!mi.days.length) return '<p class="hint keep">Nenhum dia registrado neste mês.</p>';
   const by = Object.fromEntries(mi.days.map(d => [d.k, d])), closed = mi.days.filter(d => d.status === "ok" && d.saldoEmp);
   const mx = Math.max(30, ...closed.map(d => Math.abs(d.saldoEmp))), tk = todayK();
   const best = closed.reduce((a, d) => d.saldoEmp > (a?.saldoEmp ?? 0) ? d : a, null), worst = closed.reduce((a, d) => d.saldoEmp < (a?.saldoEmp ?? 0) ? d : a, null);
@@ -430,7 +430,7 @@ function dayBars(mi, m) {
     return d ? `<button type="button" class="${cls}" data-day="${k}" title="${day} ${DSEM[dateOf(k).getDay()]}: ${open ? "em aberto, não conta" : sgn(v)}">${body}</button>` : `<div class="${cls}">${body}</div>`;
   }).join("");
   return `<div class="bars">${cols}</div>
-    <p class="hint bleg"><span><i class="lg pos"></i>ganhou horas</span><span><i class="lg neg"></i>perdeu horas</span><span><u class="bdot"></u>dia em aberto (não conta)</span><span>Toque num dia para abrir.</span></p>`;
+    <p class="hint bleg"><span><i class="lg pos"></i>ganhou horas</span><span><i class="lg neg"></i>perdeu horas</span><span><u class="bdot"></u>dia em aberto (não conta)</span><span class="desk">Toque num dia para abrir.</span></p>`;
 }
 /* cada dia mostra de onde veio o saldo: entrada, almoço e saída (tolerados em cinza) */
 const partChips = d => (d.parts || []).filter(p => p.v).map(p => `<span class="pchip ${p.emp > 0 ? "pos" : p.emp < 0 ? "neg" : "tol"}" title="${p.emp ? "" : "dentro da tolerância: o sistema ignora"}">${p.n} ${sgn(p.v)}</span>`).join("");
@@ -506,8 +506,8 @@ function pgRel() {
     ${kpis(r)}
     <div class="stats3"><div><span class="mini">Trabalhado</span><b class="num">${dur(r.work)}</b><span class="mini">de ${dur(r.exp)}</span></div><div><span class="mini">Dias trabalhados</span><b class="num">${r.nDias}</b><span class="mini">${r.nAtraso} com atraso</span></div><div><span class="mini">Média do dia</span><b class="num">${hm(r.avgIn)} → ${hm(r.avgOut)}</b><span class="mini">almoço ${r.avgLunch == null ? "—" : Math.round(r.avgLunch) + " min"}</span></div></div></div>
    <div class="box c7"><h2>Mês a mês</h2>${perMonth.length ? `<div class="tbl"><table><thead><tr><th>Mês</th><th>Trabalhado</th><th>Extras</th><th>Atrasos</th><th>Faltas</th><th>Saldo</th><th>Prêmio</th></tr></thead><tbody>
-     ${perMonth.map(x => `<tr><td>${mLabel(x.m)}</td><td class="num">${dur(x.work)}</td><td class="num pos">${sgn(x.extra)}</td><td class="num neg">${sgn(x.atraso + x.antecip)}</td><td class="num">${x.nFaltas || "—"}</td><td class="num ${x.totalEmp >= 0 ? "pos" : "neg"}"><b>${sgn(x.totalEmp)}</b></td><td>${x.totalEmp >= 0 ? '<span class="prize ok">ok</span>' : '<span class="prize bad">perdeu</span>'}</td></tr>`).join("")}</tbody></table></div>` : '<p class="hint">Nenhum dia registrado neste período.</p>'}</div>
-   <div class="box c12"><h2>O que tirou horas <small>${oc.length} dia(s)</small></h2>${oc.length ? `<div class="list">${oc.map(dayRow).join("")}</div>` : '<p class="hint">Nenhum atraso, saída antecipada ou falta no período.</p>'}</div>
+     ${perMonth.map(x => `<tr><td>${mLabel(x.m)}</td><td class="num">${dur(x.work)}</td><td class="num pos">${sgn(x.extra)}</td><td class="num neg">${sgn(x.atraso + x.antecip)}</td><td class="num">${x.nFaltas || "—"}</td><td class="num ${x.totalEmp >= 0 ? "pos" : "neg"}"><b>${sgn(x.totalEmp)}</b></td><td>${x.totalEmp >= 0 ? '<span class="prize ok">ok</span>' : '<span class="prize bad">perdeu</span>'}</td></tr>`).join("")}</tbody></table></div>` : '<p class="hint keep">Nenhum dia registrado neste período.</p>'}</div>
+   <div class="box c12"><h2>O que tirou horas <small>${oc.length} dia(s)</small></h2>${oc.length ? `<div class="list">${oc.map(dayRow).join("")}</div>` : '<p class="hint keep">Nenhum atraso, saída antecipada ou falta no período.</p>'}</div>
    </section>`;
   segBind($("#repSeg"), "t", t => { rep.tipo = t; render(); });
   if ($("#rPrev")) { $("#rPrev").onclick = () => { rep.ref = addM(R.first, -R.n); render(); }; $("#rNext").onclick = () => { rep.ref = addM(R.first, R.n); render(); }; }
@@ -608,7 +608,7 @@ function pgAjustes() {
      <label class="pref"><input type="radio" name="openMode" value="senha"> Pedir a senha</label></div>
     <div class="tools" style="margin-top:10px"><button class="btn" id="chPw">Trocar senha</button><button class="btn" id="expBtn">Baixar backup</button><label class="btn" style="cursor:pointer">Restaurar backup<input type="file" id="impFile" accept="application/json" hidden></label><button class="btn" id="outBtn">Sair</button></div>
     <div class="tools" style="margin-top:10px"><button class="btn danger" id="wipe">Apagar todos os dados</button></div></div>
-   <div class="box"><h2>Instalar no celular ou PC</h2><p class="hint" style="margin-bottom:0"><b>iPhone:</b> abra no Safari → Compartilhar → “Adicionar à Tela de Início”. <b>Android:</b> Chrome → menu ⋮ → “Instalar app”. <b>PC:</b> Chrome/Edge → ícone de instalar na barra de endereço.</p></div></div>
+   <div class="box desk"><h2>Instalar no celular ou PC</h2><p class="hint" style="margin-bottom:0"><b>iPhone:</b> abra no Safari → Compartilhar → “Adicionar à Tela de Início”. <b>Android:</b> Chrome → menu ⋮ → “Instalar app”. <b>PC:</b> Chrome/Edge → ícone de instalar na barra de endereço.</p></div></div>
    </section>`;
   const v = $("#view"), ins = [...v.querySelectorAll(".slots .hin")];
   bindRegra(); bindAvisos();
