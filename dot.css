@@ -240,3 +240,7 @@ button.bcol{cursor:pointer}button.bcol:hover{background:var(--soft)}
   .bleg{font-size:12px}
 }
 @media (max-width:760px){.dayrow{grid-template-columns:44px 1fr auto;gap:10px;padding:10px 6px}.dayrow .val{grid-column:3;margin:0;text-align:right}.dayrow .t{font-size:14px}.dayrow .t .num{letter-spacing:-.3px}}
+.acts{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+.acts .btn{padding:11px 8px;border-radius:14px;font-size:14px;background:var(--soft);border-color:transparent}
+.acts .btn.danger{background:color-mix(in srgb,var(--out) 12%,transparent);color:var(--out)}
+.stamps .tag{flex:0 0 auto}

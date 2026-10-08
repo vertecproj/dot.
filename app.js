@@ -229,7 +229,7 @@ function pgHoje() {
         <div class="slot"><span class="mini">Total</span><b class="num" id="tkW">${clock(p.work * 60)}</b></div></div>
       ${btn ? `<button class="punchbtn ${p.n === 1 ? "alt" : ""}" id="bater">${btn}</button>` : ""}
       ${p.n === 1 || p.n === 2 ? `<button class="btn endday" id="endDay">${p.n === 1 ? "Encerrar o dia aqui" : "Encerrar o dia aqui"}</button>` : ""}
-      ${p.n ? `<div class="stamps"><div class="stline">${p.b.map((t, i) => `<span>${FASES[i]} <b class="num">${fm(t)}</b></span>`).join("")}</div>${p.fim && p.b.length < 4 ? '<span class="tag">encerrado antes</span>' : ""}<button class="linkbtn" id="fixDay">Corrigir horários</button><button class="linkbtn danger" id="undoPunch">${p.fim ? "Reabrir o dia" : `Cancelar ${ART[p.b.length - 1]}`}</button></div>` : ""}`;
+      ${p.n ? `<div class="stamps"><div class="stline">${p.b.map((t, i) => `<span>${FASES[i]} <b class="num">${fm(t)}</b></span>`).join("")}</div>${p.fim && p.b.length < 4 ? '<span class="tag">encerrado antes</span>' : ""}<div class="acts"><button class="btn" id="fixDay">Corrigir horários</button><button class="btn danger" id="undoPunch">${p.fim ? "Reabrir o dia" : `Cancelar ${ART[p.b.length - 1]}`}</button></div></div>` : ""}`;
   } else {
     body = `${timeInputs(x?.b || [])}<div class="err" id="hErr"></div>
       <div class="tools" style="justify-content:flex-end"><button class="btn" id="nowBtn">Usar hora atual no próximo</button><button class="btn acc" id="saveH">Salvar</button></div>`;
