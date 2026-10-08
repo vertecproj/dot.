@@ -215,3 +215,15 @@ button.bcol{cursor:pointer}button.bcol:hover{background:var(--soft)}
 .endday{justify-self:center;border-radius:999px;padding:10px 18px}
 .linkbtn.danger{color:var(--out)}
 .kpis.kh{display:grid;grid-template-columns:repeat(3,1fr);margin-top:14px}.kpis.kh:empty{display:none}.kpis.kh .v{font:600 18px var(--body)}
+
+/* ---- Hoje no celular: só o essencial ---- */
+.mstrip{display:none}
+@media (max-width:760px){
+  .mstrip{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:22px;padding:12px 16px;margin-bottom:14px}
+  .mstrip>div{display:grid;gap:1px}
+  .mstrip b{font:700 30px/1.1 var(--display)}
+  .mstrip b.pos{color:var(--in)}.mstrip b.neg{color:var(--out)}
+  .monthside,.hojebox .slots,.avbox .avlist,.avbox .hint,.kpis.kh .kpi:nth-child(2),.kpis.kh .kpi:nth-child(5),.kpis.kh .kpi:nth-child(6){display:none}
+  .hojebox{gap:12px}
+  .daytype{font-size:12px}
+}

@@ -228,14 +228,16 @@ function pgHoje() {
         <div class="slot ${live === "t" ? "live" : ""}"><span class="mini">Tarde</span><b class="num" id="tkT">${clock(p.tarde * 60)}</b></div>
         <div class="slot"><span class="mini">Total</span><b class="num" id="tkW">${clock(p.work * 60)}</b></div></div>
       ${btn ? `<button class="punchbtn ${p.n === 1 ? "alt" : ""}" id="bater">${btn}</button>` : ""}
-      ${p.n === 1 || p.n === 2 ? `<button class="btn endday" id="endDay">${p.n === 1 ? "Encerrar o dia aqui (só manhã)" : "Encerrar o dia aqui (não vou voltar)"}</button>` : ""}
+      ${p.n === 1 || p.n === 2 ? `<button class="btn endday" id="endDay">${p.n === 1 ? "Encerrar o dia aqui" : "Encerrar o dia aqui"}</button>` : ""}
       ${p.n ? `<div class="stamps">${p.b.map((t, i) => `<span>${FASES[i]} <b class="num">${fm(t)}</b></span>`).join("")}${p.fim && p.b.length < 4 ? '<span class="tag">encerrado antes</span>' : ""}<button class="linkbtn" id="fixDay">Corrigir horários</button><button class="linkbtn danger" id="undoPunch">${p.fim ? "Reabrir o dia" : `Cancelar ${ART[p.b.length - 1]}`}</button></div>` : ""}`;
   } else {
     body = `${timeInputs(x?.b || [])}<div class="err" id="hErr"></div>
       <div class="tools" style="justify-content:flex-end"><button class="btn" id="nowBtn">Usar hora atual no próximo</button><button class="btn acc" id="saveH">Salvar</button></div>`;
   }
   const info = hojeInfo(k);
-  $("#view").innerHTML = `<section class="grid anim" style="margin-top:0">
+  const hj = mi.hoje ? mi.totalEmp + mi.hoje.saldo : null;
+  $("#view").innerHTML = `<div class="mstrip anim"><div><span class="mini">Banco do mês</span><b class="num ${mi.totalEmp >= 0 ? "pos" : "neg"}">${sgn(mi.totalEmp)}</b>${hj != null ? `<span class="mini">com hoje ${sgn(hj)}</span>` : ""}</div><span class="prize ${mi.totalEmp >= 0 ? "ok" : "bad"}">${mi.totalEmp >= 0 ? "Prêmio garantido" : "Prêmio em risco"}</span></div>
+   <section class="grid anim" style="margin-top:0">
    <div class="box c7 hojebox"><div class="phead"><h2>Registrar ponto</h2>
      <div class="seg" id="modoSeg" style="grid-template-columns:repeat(2,1fr)"><button data-m="crono" aria-pressed="${modo === "crono"}">Timer</button><button data-m="man" aria-pressed="${modo === "man"}">Digitar</button></div></div>
      ${body}
@@ -244,7 +246,7 @@ function pgHoje() {
      ${tipo === "normal" ? `<div class="daytype">Hoje não trabalhou? <button class="linkbtn" data-tipo="feriado">Feriado</button> · <button class="linkbtn" data-tipo="atestado">Atestado</button> · <button class="linkbtn" data-tipo="falta">Falta</button></div>` : ""}
    </div>
    <div class="c5" style="display:grid;gap:16px;align-content:start">
-     ${monthCard(mi, ym(k), true)}
+     <div class="monthside">${monthCard(mi, ym(k), true)}</div>
      ${avisosHoje(k)}
    </div></section>`;
   bindHoje(k);
@@ -356,7 +358,7 @@ function alvos(k) {
 function avisosHoje(k) {
   const A = av(), list = alvos(k), now = nowMin();
   const perm = !("Notification" in window) ? "Este navegador não mostra notificações; vou avisar só na tela." : Notification.permission === "denied" ? "Notificações bloqueadas no navegador: vou avisar só na tela. Libere nas configurações do site." : "";
-  return `<div class="box"><h2>Avisos <button class="btn sm" id="avCfg">Personalizar</button></h2>
+  return `<div class="box avbox"><h2>Avisos <button class="btn sm" id="avCfg">Personalizar</button></h2>
     <label class="pref"><input type="checkbox" id="avisar" ${A.on ? "checked" : ""}> Avisar ${A.antec} min antes de cada horário</label>
     ${A.on && list.length ? `<div class="avlist">${list.map(o => `<div class="${o.aviso < now ? "past" : ""}"><span class="mini">${o.t}</span><b class="num">${fm(o.alvo)}</b><span class="mini">aviso às ${fm(o.aviso)}</span></div>`).join("")}</div>` : ""}
     ${perm ? `<p class="hint" style="margin:8px 0 0">${perm}</p>` : ""}</div>`;
