@@ -508,9 +508,10 @@ function repRange() {
 }
 const fmtD = k => k.slice(8) + "/" + k.slice(5, 7) + "/" + k.slice(0, 4);
 function pgRel() {
-  const R = repRange(), r = rangeInfo(R.from, R.to), ok = r.totalEmp >= 0;
+  const R = repRange(), r = rangeInfo(R.from, R.to);
   const months = []; for (let m = ym(R.from); m <= ym(R.to); m = addM(m, 1)) months.push(m);
-  const perMonth = months.map(m => { const f = m + "-01" < R.from ? R.from : m + "-01", t = lastDay(m) > R.to ? R.to : lastDay(m); return { m, ...rangeInfo(f, t) }; }).filter(x => x.closed.length);
+  const perMonth = months.map(m => { const f = m + "-01" < R.from ? R.from : m + "-01", t = lastDay(m) > R.to ? R.to : lastDay(m); const full = f === m + "-01" && t === lastDay(m), of = full ? S.oficial[m] : null, i = rangeInfo(f, t); return { m, ...i, of, sal: of != null ? of : i.totalEmp }; }).filter(x => x.closed.length || x.of != null);
+  const tot = perMonth.length ? perMonth.reduce((a, x) => a + x.sal, 0) : r.totalEmp, ok = tot >= 0, usaOf = perMonth.some(x => x.of != null);
   const oc = r.closed.filter(d => d.tipo === "falta" || d.parts?.some(p => p.emp < 0));
   const hm = v => v == null ? "—" : fm(Math.round(v));
   $("#view").innerHTML = `<section class="grid anim" style="margin-top:0">
@@ -519,12 +520,12 @@ function pgRel() {
       : `<div class="tools"><label class="fld">De<input type="date" id="rDe" value="${R.from}" max="${todayK()}"></label><label class="fld">Até<input type="date" id="rAte" value="${R.to}" max="${todayK()}"></label></div>`}
     <div class="tools noprint"><button class="btn" id="csvBtn">Baixar planilha (CSV)</button><button class="btn acc" id="prnBtn">Imprimir / PDF</button></div></div>
    <div class="box c5"><h2>Saldo do período <small>${fmtD(R.from)} a ${fmtD(R.to)}</small></h2>
-    <div class="bigbal ${ok ? "pos" : "neg"} num">${sgn(r.totalEmp)}</div>
-    <p class="hint" style="margin:0">Conta do sistema da empresa. No relógio: <b class="num">${sgn(r.total)}</b>.${perMonth.length > 1 ? " O banco zera todo mês: este total é só a soma dos meses." : ""}</p>
+    <div class="bigbal ${ok ? "pos" : "neg"} num">${sgn(tot)}</div>
+    <p class="hint" style="margin:0">${usaOf ? "Meses com saldo oficial digitado usam o oficial; os outros, a conta do app." : "Conta do sistema da empresa."} No relógio: <b class="num">${sgn(r.total)}</b>.${perMonth.length > 1 ? " O banco zera todo mês: este total é só a soma dos meses." : ""}</p>
     ${kpis(r)}
     <div class="stats3"><div><span class="mini">Trabalhado</span><b class="num">${dur(r.work)}</b><span class="mini">de ${dur(r.exp)}</span></div><div><span class="mini">Dias trabalhados</span><b class="num">${r.nDias}</b><span class="mini">${r.nAtraso} com atraso</span></div><div><span class="mini">Média do dia</span><b class="num">${hm(r.avgIn)} → ${hm(r.avgOut)}</b><span class="mini">almoço ${r.avgLunch == null ? "—" : Math.round(r.avgLunch) + " min"}</span></div></div></div>
    <div class="box c7"><h2>Mês a mês</h2>${perMonth.length ? `<div class="tbl"><table><thead><tr><th>Mês</th><th>Trabalhado</th><th>Extras</th><th>Atrasos</th><th>Faltas</th><th>Saldo</th><th>Prêmio</th></tr></thead><tbody>
-     ${perMonth.map(x => `<tr><td>${mLabel(x.m)}</td><td class="num">${dur(x.work)}</td><td class="num pos">${sgn(x.extra)}</td><td class="num neg">${sgn(x.atraso + x.antecip)}</td><td class="num">${x.nFaltas || "—"}</td><td class="num ${x.totalEmp >= 0 ? "pos" : "neg"}"><b>${sgn(x.totalEmp)}</b></td><td>${x.totalEmp >= 0 ? '<span class="prize ok">ok</span>' : '<span class="prize bad">perdeu</span>'}</td></tr>`).join("")}</tbody></table></div>` : '<p class="hint keep">Nenhum dia registrado neste período.</p>'}</div>
+     ${perMonth.map(x => `<tr><td>${mLabel(x.m)}</td><td class="num">${dur(x.work)}</td><td class="num pos">${sgn(x.extra)}</td><td class="num neg">${sgn(x.atraso + x.antecip)}</td><td class="num">${x.nFaltas || "—"}</td><td class="num ${x.sal >= 0 ? "pos" : "neg"}"><b>${sgn(x.sal)}</b>${x.of != null ? ' <span class="mini">oficial</span>' : ""}</td><td>${x.sal >= 0 ? '<span class="prize ok">ok</span>' : '<span class="prize bad">perdeu</span>'}</td></tr>`).join("")}</tbody></table></div>` : '<p class="hint keep">Nenhum dia registrado neste período.</p>'}</div>
    ${oficialBox(ym(R.to))}
    <div class="box c12"><h2>O que tirou horas <small>${oc.length} dia(s)</small></h2>${oc.length ? `<div class="list">${oc.map(dayRow).join("")}</div>` : '<p class="hint keep">Nenhum atraso, saída antecipada ou falta no período.</p>'}</div>
    </section>`;
@@ -537,7 +538,7 @@ function pgRel() {
   $("#csvBtn").onclick = () => {
     const L = [["Data", "Dia", "Tipo", "Entrada", "Almoço", "Volta", "Saída", "Trabalhado", "Saldo (empresa)", "Saldo (relógio)", "Obs"]];
     r.closed.forEach(d => L.push([fmtD(d.k), DSEM[dateOf(d.k).getDay()], TIPOS[d.tipo || "normal"], ...[0, 1, 2, 3].map(i => d.b?.[i] || ""), dur(d.work), sgn(d.saldoEmp), sgn(d.saldo), d.obs || ""]));
-    L.push([], ["Total", "", "", "", "", "", "", dur(r.work), sgn(r.totalEmp), sgn(r.total), ""]);
+    L.push([], ["Total", "", "", "", "", "", "", dur(r.work), sgn(tot), sgn(r.total), ""]);
     const csv = "\ufeff" + L.map(l => l.map(c => `"${String(c).replace(/"/g, '""')}"`).join(";")).join("\r\n");
     const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = `jornada-${R.from}-a-${R.to}.csv`; a.click(); toast("Planilha baixada");
   };
