@@ -92,7 +92,8 @@ function rangeInfo(from, to) {
 }
 function monthInfo(m) {
   const r = rangeInfo(m + "-01", lastDay(m));
-  return { ...r, hoje: r.days.find(d => d.status === "andamento"), vazios: r.days.filter(d => d.status === "vazio" || d.status === "incompleto") };
+  const of = S.oficial[m];
+  return { ...r, calc: r.totalEmp, totalEmp: of != null ? of : r.totalEmp, hoje: r.days.find(d => d.status === "andamento"), vazios: r.days.filter(d => d.status === "vazio" || d.status === "incompleto") };
 }
 
 /* ---------- utilidades de UI ---------- */
@@ -274,7 +275,7 @@ function monthCard(mi, m, compact) {
     <div class="bigbal ${ok ? "pos" : "neg"} num">${sgn(mi.totalEmp)}</div>
     <span class="prize ${ok ? "ok" : "bad"}">${ok ? "Prêmio garantido" : "Prêmio em risco"}</span>
     ${compact ? (hj != null ? `<p class="hint" style="margin:8px 0 0">Com hoje até agora: <b class="${hj >= 0 ? "pos" : "neg"}">${sgn(hj)}</b></p>` : "") : `<p class="hint" style="margin:8px 0 0">Como o sistema ${regra().empresa ? "da " + esc(regra().empresa) : "da empresa"} conta (${regra().tol ? `ignora até ${regra().tol} min por marcação${regra().teto ? `, máx. ${regra().teto} no dia` : ""}` : "sem tolerância"}). ${ok ? `Margem de ${dur(mi.totalEmp)}.` : `Faltam ${dur(-mi.totalEmp)} para zerar.`}${hj != null ? ` Com hoje até agora: <b class="${hj >= 0 ? "pos" : "neg"}">${sgn(hj)}</b>.` : ""}</p>
-    <p class="hint" style="margin:4px 0 0">No relógio, minuto a minuto: <b class="num">${sgn(mi.total)}</b>.${of != null ? ` Sistema informado: <b class="num">${sgn(of)}</b> (diferença ${sgn(of - mi.totalEmp)}).` : ""}</p>`}
+    <p class="hint" style="margin:4px 0 0">No relógio, minuto a minuto: <b class="num">${sgn(mi.total)}</b>.${of != null ? ` Saldo oficial digitado: <b class="num">${sgn(of)}</b>; a conta do app dá <b class="num">${sgn(mi.calc)}</b> (diferença ${sgn(of - mi.calc)}).` : ""}</p>`}
     ${!compact ? `<p class="mob">${ok ? `Margem de ${dur(mi.totalEmp)}` : `Faltam ${dur(-mi.totalEmp)} para zerar`}</p>${kpis(mi)}` : ""}
     ${mi.vazios.length ? `<p class="warnchip" style="margin-top:10px">${mi.vazios.length} dia(s) sem registro completo</p>` : ""}</div>`;
 }
