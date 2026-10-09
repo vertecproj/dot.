@@ -406,20 +406,23 @@ function pgMes() {
   v.querySelectorAll("[data-day]").forEach(r => r.onclick = () => editDay(r.dataset.day));
   $("#addDay").onclick = pickDay;
 }
-/* saldo oficial da empresa: fica em Ajustes; o mês escolhido começa no mês que estava aberto em Mês */
-let ofM = null;
-function oficialBox() {
-  ofM = ofM || cur; const of = S.oficial[ofM];
-  return `<div class="box" id="ofBox"><h2>Saldo do sistema da empresa</h2><p class="hint">Digite o saldo que o sistema oficial mostra (ex.: +0:09 ou -1:20) para comparar com a conta do app em Mês.</p>
-   <div class="tools" style="margin-bottom:8px"><button class="btn sm" id="ofPrev" aria-label="Mês anterior">‹</button><b>${mLabel(ofM)}</b><button class="btn sm" id="ofNext" aria-label="Próximo mês">›</button></div>
-   <div class="tools"><input class="hin wide" id="ofIn" inputmode="text" placeholder="+0:00" value="${of != null ? sgn(of).replace("−", "-") : ""}" aria-label="Saldo oficial"><button class="btn acc" id="ofSave">Salvar</button>${of != null ? '<button class="btn" id="ofDel">Limpar</button>' : ""}</div>
-   <div class="err" id="ofErr"></div></div>`;
+/* saldo oficial da empresa: fica no Relatório, para o mês em que o período termina */
+function parseSaldo(t) {
+  t = t.trim().replace(/[−–—]/g, "-").replace(/\s+/g, "").replace(/h/i, ":").replace(/min$/i, "");
+  const mm = t.match(/^([+-]?)(\d{1,3}):(\d{1,2})$/); if (!mm || +mm[3] > 59) return null;
+  return (mm[1] === "-" ? -1 : 1) * (+mm[2] * 60 + +mm[3]);
 }
-function bindOficial() {
-  $("#ofPrev").onclick = () => { ofM = addM(ofM, -1); render(); };
-  $("#ofNext").onclick = () => { ofM = addM(ofM, 1); render(); };
-  $("#ofSave").onclick = () => { const s = $("#ofIn").value.trim().replace("−", "-"), mm = s.match(/^([+-]?)(\d{1,3}):([0-5]\d)$/); if (!mm) return $("#ofErr").textContent = "Use o formato +0:09 ou -1:20."; S.oficial[ofM] = (mm[1] === "-" ? -1 : 1) * (+mm[2] * 60 + +mm[3]); commit("Saldo oficial salvo"); };
-  if ($("#ofDel")) $("#ofDel").onclick = () => { delete S.oficial[ofM]; commit(); };
+function oficialBox(m) {
+  const of = S.oficial[m], mine = rangeInfo(m + "-01", lastDay(m)).totalEmp;
+  return `<div class="box c12 noprint" id="ofBox"><h2>Saldo do sistema da empresa <small>${mLabel(m)}</small></h2><p class="hint keep">Digite o saldo que o sistema oficial mostra para este mês (ex.: +0:09 ou -1:20) e compare com a conta do app (<b class="num">${sgn(mine)}</b>).</p>
+   <div class="tools"><input class="hin wide" id="ofIn" inputmode="text" placeholder="+0:00" value="${of != null ? sgn(of).replace("−", "-") : ""}" aria-label="Saldo oficial"><button class="btn acc" id="ofSave">Salvar</button>${of != null ? '<button class="btn" id="ofDel">Limpar</button>' : ""}</div>
+   <div class="err" id="ofErr"></div>${of != null ? `<p class="hint keep" style="margin:8px 0 0">Diferença do app para o sistema: <b class="num">${sgn(of - mine)}</b>.</p>` : ""}</div>`;
+}
+function bindOficial(m) {
+  const save = () => { const v = parseSaldo($("#ofIn").value); if (v == null) return $("#ofErr").textContent = "Use o formato +0:09 ou -1:20."; S.oficial[m] = v; commit("Saldo oficial salvo"); };
+  $("#ofSave").onclick = save;
+  $("#ofIn").onkeydown = e => { if (e.key === "Enter") save(); };
+  if ($("#ofDel")) $("#ofDel").onclick = () => { delete S.oficial[m]; commit(); };
 }
 /* gráfico do mês: uma coluna por dia do calendário. Só dia fechado tem barra (é o que conta no saldo);
    dia em aberto vira um ponto na linha do zero. */
@@ -522,8 +525,10 @@ function pgRel() {
     <div class="stats3"><div><span class="mini">Trabalhado</span><b class="num">${dur(r.work)}</b><span class="mini">de ${dur(r.exp)}</span></div><div><span class="mini">Dias trabalhados</span><b class="num">${r.nDias}</b><span class="mini">${r.nAtraso} com atraso</span></div><div><span class="mini">Média do dia</span><b class="num">${hm(r.avgIn)} → ${hm(r.avgOut)}</b><span class="mini">almoço ${r.avgLunch == null ? "—" : Math.round(r.avgLunch) + " min"}</span></div></div></div>
    <div class="box c7"><h2>Mês a mês</h2>${perMonth.length ? `<div class="tbl"><table><thead><tr><th>Mês</th><th>Trabalhado</th><th>Extras</th><th>Atrasos</th><th>Faltas</th><th>Saldo</th><th>Prêmio</th></tr></thead><tbody>
      ${perMonth.map(x => `<tr><td>${mLabel(x.m)}</td><td class="num">${dur(x.work)}</td><td class="num pos">${sgn(x.extra)}</td><td class="num neg">${sgn(x.atraso + x.antecip)}</td><td class="num">${x.nFaltas || "—"}</td><td class="num ${x.totalEmp >= 0 ? "pos" : "neg"}"><b>${sgn(x.totalEmp)}</b></td><td>${x.totalEmp >= 0 ? '<span class="prize ok">ok</span>' : '<span class="prize bad">perdeu</span>'}</td></tr>`).join("")}</tbody></table></div>` : '<p class="hint keep">Nenhum dia registrado neste período.</p>'}</div>
+   ${oficialBox(ym(R.to))}
    <div class="box c12"><h2>O que tirou horas <small>${oc.length} dia(s)</small></h2>${oc.length ? `<div class="list">${oc.map(dayRow).join("")}</div>` : '<p class="hint keep">Nenhum atraso, saída antecipada ou falta no período.</p>'}</div>
    </section>`;
+  bindOficial(ym(R.to));
   segBind($("#repSeg"), "t", t => { rep.tipo = t; render(); });
   if ($("#rPrev")) { const go = v => { if (R.n < 0) rep.refD = v; else rep.ref = v; render(); }; $("#rPrev").onclick = () => go(R.prev); $("#rNext").onclick = () => go(R.next); }
   if ($("#rDe")) { const ch = () => { const a = $("#rDe").value, b = $("#rAte").value; if (a && b) { rep.de = a < b ? a : b; rep.ate = a < b ? b : a; render(); } }; $("#rDe").onchange = ch; $("#rAte").onchange = ch; }
@@ -614,7 +619,6 @@ function pgAjustes() {
     <p class="hint" style="margin-top:10px">O banco de horas fecha por mês: o saldo de um mês não passa para o seguinte.</p></div>
    <div class="c6" style="display:grid;gap:16px;align-content:start">
    ${regraBox()}
-   ${oficialBox()}
    ${avisosBox()}
    <div class="box"><h2>Aparência</h2><p class="hint">Por padrão as cores mudam com o horário: amanhecer, dia, entardecer, noite e madrugada.</p><div class="fld">Céu<div class="seg" id="themeSeg">${[["auto", "Seguir o horário"], ["light", "Sempre dia"], ["dark", "Sempre noite"]].map(([k, t]) => `<button data-t="${k}" aria-pressed="${S.prefs.theme === k}">${t}</button>`).join("")}</div></div></div>
    <div class="box"><h2>Conta</h2><p class="hint">Conectado como <b>${esc(Store.user?.email)}</b>. Seus dados ficam criptografados. Se esquecer a senha, é só pedir um código no seu e-mail.</p>
@@ -627,7 +631,7 @@ function pgAjustes() {
    <div class="box desk"><h2>Instalar no celular ou PC</h2><p class="hint" style="margin-bottom:0"><b>iPhone:</b> abra no Safari → Compartilhar → “Adicionar à Tela de Início”. <b>Android:</b> Chrome → menu ⋮ → “Instalar app”. <b>PC:</b> Chrome/Edge → ícone de instalar na barra de endereço.</p></div></div>
    </section>`;
   const v = $("#view"), ins = [...v.querySelectorAll(".slots .hin")];
-  bindRegra(); bindOficial(); bindAvisos();
+  bindRegra(); bindAvisos();
   ins.forEach((inp, i) => maskTime(inp, () => ins[i + 1]?.focus()));
   let dias = [...j.dias];
   $("#wdSeg").onclick = e => { const b = e.target.closest("button"); if (!b) return; const d = +b.dataset.d; dias = dias.includes(d) ? dias.filter(x => x !== d) : [...dias, d]; b.setAttribute("aria-pressed", dias.includes(d)); };
